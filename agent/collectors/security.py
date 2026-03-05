@@ -16,6 +16,75 @@ SUSPICIOUS_PROCESS_NAMES = {
     "cryptominer", "xmrig", "cgminer", "minerd",
 }
 
+# Well-known port → service description
+KNOWN_SERVICES: dict[int, str] = {
+    20:    "FTP (data)",
+    21:    "FTP (control)",
+    22:    "SSH",
+    23:    "Telnet",
+    25:    "SMTP",
+    53:    "DNS",
+    67:    "DHCP Server",
+    68:    "DHCP Client",
+    80:    "HTTP",
+    88:    "Kerberos",
+    110:   "POP3",
+    111:   "RPC",
+    123:   "NTP",
+    135:   "MS-RPC",
+    137:   "NetBIOS Name",
+    138:   "NetBIOS Datagram",
+    139:   "NetBIOS Session",
+    143:   "IMAP",
+    161:   "SNMP",
+    389:   "LDAP",
+    443:   "HTTPS",
+    445:   "SMB / Windows File Sharing",
+    512:   "rexec",
+    513:   "rlogin",
+    514:   "rsh / Syslog",
+    548:   "AFP (Apple Filing Protocol)",
+    587:   "SMTP (Submission)",
+    631:   "CUPS / IPP Printing",
+    993:   "IMAP over SSL",
+    995:   "POP3 over SSL",
+    1080:  "SOCKS Proxy",
+    1194:  "OpenVPN",
+    1433:  "Microsoft SQL Server",
+    1521:  "Oracle Database",
+    2049:  "NFS",
+    2375:  "Docker (unencrypted)",
+    2376:  "Docker TLS",
+    3000:  "Dev server (common)",
+    3283:  "Apple Remote Desktop",
+    3306:  "MySQL / MariaDB",
+    3389:  "RDP (Remote Desktop)",
+    4000:  "Dev server (common)",
+    5000:  "Dev server / AirPlay Receiver",
+    5037:  "Android Debug Bridge (ADB)",
+    5173:  "Vite dev server",
+    5432:  "PostgreSQL",
+    5900:  "VNC",
+    6379:  "Redis",
+    6667:  "IRC",
+    7000:  "AirPlay / dev server",
+    8000:  "HTTP dev server",
+    8080:  "HTTP alt / proxy",
+    8443:  "HTTPS alt",
+    8888:  "Jupyter Notebook",
+    9000:  "PHP-FPM / dev server",
+    9090:  "Prometheus",
+    9200:  "Elasticsearch HTTP",
+    9300:  "Elasticsearch cluster",
+    11211: "Memcached",
+    27017: "MongoDB",
+    27018: "MongoDB (shard)",
+    27019: "MongoDB (config)",
+    31337: "Back Orifice (malware)",
+    50070: "Hadoop NameNode",
+    58284: "rapportd (Apple continuity)",
+}
+
 # Ports that should never be open on a personal machine (customize as needed)
 UNUSUAL_PORTS = {
     23,    # Telnet
@@ -33,6 +102,36 @@ UNUSUAL_PORTS = {
     6667,  # IRC (common C2)
     31337, # Back Orifice
 }
+
+
+def _full_process_name(pid: int | None) -> str | None:
+    """Get the full executable name for a PID (handles lsof truncation)."""
+    if not pid:
+        return None
+    try:
+        return psutil.Process(pid).name()
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        pass
+    # Fallback: ask ps directly
+    try:
+        result = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "comm="],
+            capture_output=True, text=True, timeout=3,
+        )
+        name = result.stdout.strip()
+        return name if name else None
+    except Exception:
+        return None
+
+
+def _enrich_port_entry(entry: dict) -> dict:
+    """Add service label and resolve full process name."""
+    port = entry["port"]
+    entry["service"] = KNOWN_SERVICES.get(port, "")
+    full = _full_process_name(entry.get("pid"))
+    if full:
+        entry["process"] = full
+    return entry
 
 
 def _ports_via_lsof() -> list:
@@ -139,13 +238,13 @@ def get_open_ports() -> dict:
             except (FileNotFoundError, subprocess.TimeoutExpired):
                 pass
 
-    # Deduplicate by port number
+    # Deduplicate by port number, enrich with service label + full process name
     seen = set()
     unique = []
     for entry in listening:
         if entry["port"] not in seen:
             seen.add(entry["port"])
-            unique.append(entry)
+            unique.append(_enrich_port_entry(entry))
     listening = sorted(unique, key=lambda e: e["port"])
 
     for entry in listening:

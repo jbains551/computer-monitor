@@ -511,6 +511,9 @@ main {
   justify-content: center;
   gap: 8px;
 }
+.port-num { font-family: var(--mono); font-weight: 700; color: var(--accent2) !important; }
+.service-label { color: var(--text2); font-family: var(--font); }
+
 .stat-row {
   display: flex;
   align-items: center;

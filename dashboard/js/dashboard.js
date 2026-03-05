@@ -288,14 +288,21 @@ function renderSnapshot(snap) {
   const flaggedSet = new Set((ports.flagged || []).map(f => f.port));
   setHTML("port-list", listening.length
     ? `<table class="data-table">
-        <thead><tr><th>Port</th><th>Process</th><th>PID</th><th>Status</th></tr></thead>
-        <tbody>${listening.slice(0,30).map(p => `
-          <tr>
-            <td>${p.port}</td>
-            <td title="${escHtml(String(p.address))}">${escHtml(p.process)}</td>
-            <td>${p.pid ?? "—"}</td>
-            <td>${flaggedSet.has(p.port) ? '<span class="tag-flag">FLAGGED</span>' : '<span class="tag-ok">OK</span>'}</td>
-          </tr>`).join("")}
+        <thead><tr><th>Port</th><th>Process</th><th>Service / App</th><th>Status</th></tr></thead>
+        <tbody>${listening.slice(0,30).map(p => {
+          const service = p.service
+            ? `<span class="service-label">${escHtml(p.service)}</span>`
+            : `<span class="text-muted">port ${p.port}</span>`;
+          const flag = flaggedSet.has(p.port)
+            ? '<span class="tag-flag">FLAGGED</span>'
+            : '<span class="tag-ok">OK</span>';
+          return `<tr>
+            <td class="port-num">${p.port}</td>
+            <td title="PID ${p.pid ?? '?'} · ${escHtml(String(p.address))}">${escHtml(p.process || '—')}</td>
+            <td>${service}</td>
+            <td>${flag}</td>
+          </tr>`;
+        }).join("")}
         </tbody>
        </table>${listening.length > 30 ? `<p class="empty">+${listening.length-30} more</p>` : ""}`
     : '<p class="empty">No listening ports detected</p>');
