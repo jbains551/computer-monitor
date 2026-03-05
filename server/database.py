@@ -139,7 +139,19 @@ def list_machines() -> list:
     return [dict(r) for r in rows]
 
 
+def alert_exists(machine: str, category: str, message: str) -> bool:
+    """Return True if an identical alert already exists (acknowledged or not)."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM alerts WHERE machine=? AND category=? AND message=? LIMIT 1",
+            (machine, category, message),
+        ).fetchone()
+    return row is not None
+
+
 def save_alert(machine: str, severity: str, category: str, message: str):
+    if alert_exists(machine, category, message):
+        return
     with get_conn() as conn:
         conn.execute(
             "INSERT INTO alerts (machine, severity, category, message, timestamp) VALUES (?,?,?,?,?)",
