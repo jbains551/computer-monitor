@@ -45,6 +45,20 @@ def init_db():
                 last_seen   REAL NOT NULL,
                 first_seen  REAL NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS commands (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                machine     TEXT NOT NULL,
+                command     TEXT NOT NULL,
+                status      TEXT NOT NULL DEFAULT 'pending',
+                output      TEXT,
+                created_at  REAL NOT NULL,
+                started_at  REAL,
+                completed_at REAL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_commands_machine
+                ON commands(machine, status, created_at DESC);
         """)
 
 
@@ -153,6 +167,49 @@ def get_alerts(machine: str | None = None, limit: int = 50, unacked_only: bool =
 def acknowledge_alert(alert_id: int):
     with get_conn() as conn:
         conn.execute("UPDATE alerts SET acknowledged=1 WHERE id=?", (alert_id,))
+
+
+def queue_command(machine: str, command: str) -> int:
+    with get_conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO commands (machine, command, status, created_at) VALUES (?,?,?,?)",
+            (machine, command, "pending", time.time()),
+        )
+        return cur.lastrowid
+
+
+def get_pending_commands(machine: str) -> list:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, command FROM commands WHERE machine=? AND status='pending' ORDER BY created_at ASC",
+            (machine,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def update_command(command_id: int, status: str, output: str | None = None):
+    now = time.time()
+    if status == "running":
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE commands SET status=?, started_at=? WHERE id=?",
+                (status, now, command_id),
+            )
+    else:
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE commands SET status=?, output=?, completed_at=? WHERE id=?",
+                (status, output, now, command_id),
+            )
+
+
+def get_commands(machine: str, limit: int = 20) -> list:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM commands WHERE machine=? ORDER BY created_at DESC LIMIT ?",
+            (machine, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def purge_old_snapshots(days: int = 30):

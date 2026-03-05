@@ -169,6 +169,7 @@ async function loadMachineData(machine) {
     renderAlerts(alerts);
   } catch (_) {}
 
+  await loadCommands(machine);
   reinitIcons();
 }
 
@@ -385,6 +386,74 @@ async function ackAlert(id) {
   } catch {
     alert("Set your API key first:\n\nlocalStorage.setItem('monitor_api_key', 'your-key')");
   }
+}
+
+// ── Commands ──────────────────────────────────────────────────────────────────
+
+async function runUpdateAll() {
+  const key = localStorage.getItem("monitor_api_key") || "";
+  if (!key) {
+    alert("Set your API key first in the browser console:\n\nlocalStorage.setItem('monitor_api_key', 'your-key')");
+    return;
+  }
+  if (!currentMachine) return;
+  const btn = document.getElementById("btn-update-all");
+  if (btn) { btn.disabled = true; btn.classList.add("running"); }
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/machines/${encodeURIComponent(currentMachine)}/commands`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ command: "update_packages" }),
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      await loadCommands(currentMachine);
+    } else {
+      alert(`Failed to queue command: ${data.detail || JSON.stringify(data)}`);
+    }
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.classList.remove("running"); reinitIcons(); }
+  }
+}
+
+async function loadCommands(machine) {
+  try {
+    const cmds = await api(`/api/machines/${encodeURIComponent(machine)}/commands?limit=10`);
+    renderCommands(cmds);
+  } catch (_) {}
+}
+
+function renderCommands(cmds) {
+  const el = document.getElementById("command-list");
+  if (!el) return;
+  if (!cmds.length) { el.innerHTML = '<p class="empty">No commands run yet</p>'; return; }
+
+  el.innerHTML = cmds.map(c => {
+    const name = { update_packages: "Update All Packages" }[c.command] || c.command;
+    const age = fmtAgo(Math.round(Date.now()/1000 - c.created_at));
+    const hasOutput = c.output && c.output.trim();
+    const isActive = c.status === "pending" || c.status === "running";
+    return `<div class="cmd-item">
+      <div class="cmd-header" onclick="toggleOutput(${c.id})">
+        <span class="cmd-name">${escHtml(name)}</span>
+        <span class="cmd-time">${age}</span>
+        <span class="cmd-status ${c.status}">${isActive ? '<span style="animation:spin 1s linear infinite;display:inline-block">↻</span> ' : ''}${c.status}</span>
+      </div>
+      ${hasOutput
+        ? `<div class="cmd-output" id="cmdout-${c.id}">${escHtml(c.output)}</div>`
+        : isActive
+          ? `<div class="cmd-output" id="cmdout-${c.id}" style="color:var(--muted)">Waiting for agent to pick up command… (checks every 60s)</div>`
+          : ''}
+    </div>`;
+  }).join("");
+}
+
+function toggleOutput(id) {
+  const el = document.getElementById(`cmdout-${id}`);
+  if (el) el.classList.toggle("open");
 }
 
 // ── Server status ─────────────────────────────────────────────────────────────

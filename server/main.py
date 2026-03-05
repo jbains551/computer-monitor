@@ -111,6 +111,37 @@ def acknowledge_alert(alert_id: int):
     return {"status": "ok"}
 
 
+# ── Commands ───────────────────────────────────────────────────────────────────
+
+ALLOWED_COMMANDS = {"update_packages"}
+
+@app.post("/api/machines/{machine}/commands", dependencies=[Depends(verify_api_key)])
+def queue_command(machine: str, body: dict):
+    command = body.get("command", "")
+    if command not in ALLOWED_COMMANDS:
+        raise HTTPException(400, f"Unknown command '{command}'. Allowed: {sorted(ALLOWED_COMMANDS)}")
+    cmd_id = database.queue_command(machine, command)
+    return {"status": "queued", "id": cmd_id, "command": command}
+
+
+@app.get("/api/machines/{machine}/commands/pending", dependencies=[Depends(verify_api_key)])
+def get_pending_commands(machine: str):
+    return database.get_pending_commands(machine)
+
+
+@app.post("/api/machines/{machine}/commands/{command_id}/result", dependencies=[Depends(verify_api_key)])
+def command_result(machine: str, command_id: int, body: dict):
+    status = body.get("status", "done")
+    output = body.get("output", "")
+    database.update_command(command_id, status, output)
+    return {"status": "ok"}
+
+
+@app.get("/api/machines/{machine}/commands")
+def list_commands(machine: str, limit: int = Query(20, ge=1, le=100)):
+    return database.get_commands(machine, limit=limit)
+
+
 @app.get("/api/status")
 def server_status():
     machines = database.list_machines()

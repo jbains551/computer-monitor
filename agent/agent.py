@@ -13,6 +13,7 @@ import argparse
 import json
 import logging
 import platform
+import subprocess
 import time
 from pathlib import Path
 
@@ -87,6 +88,91 @@ def send_snapshot(snapshot: dict, cfg: dict) -> bool:
         return False
 
 
+def run_update_packages() -> str:
+    system_name = platform.system()
+    cmds = {
+        "Darwin":  [["brew", "update"], ["brew", "upgrade"]],
+        "Linux":   [["sudo", "apt-get", "update", "-y"], ["sudo", "apt-get", "upgrade", "-y"]],
+        "Windows": [["winget", "upgrade", "--all", "--include-unknown", "--silent"]],
+    }
+    steps = cmds.get(system_name, [])
+    if not steps:
+        return f"Unsupported OS: {system_name}"
+
+    output_lines = []
+    for cmd in steps:
+        log.info("Running: %s", " ".join(cmd))
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=600
+            )
+            output_lines.append(f"$ {' '.join(cmd)}")
+            if result.stdout.strip():
+                output_lines.append(result.stdout.strip())
+            if result.stderr.strip():
+                output_lines.append(result.stderr.strip())
+            if result.returncode != 0:
+                output_lines.append(f"[exit code {result.returncode}]")
+        except FileNotFoundError:
+            output_lines.append(f"Command not found: {cmd[0]}")
+        except subprocess.TimeoutExpired:
+            output_lines.append(f"Timed out after 600s: {' '.join(cmd)}")
+    return "\n".join(output_lines)
+
+
+COMMAND_HANDLERS = {
+    "update_packages": run_update_packages,
+}
+
+
+def poll_and_run_commands(cfg: dict):
+    base = cfg["server_url"].rstrip("/")
+    headers = {"Authorization": f"Bearer {cfg['api_key']}"}
+    machine = cfg["machine_name"]
+
+    try:
+        resp = requests.get(
+            f"{base}/api/machines/{machine}/commands/pending",
+            headers=headers, timeout=cfg["timeout_seconds"],
+        )
+        if resp.status_code != 200:
+            return
+        pending = resp.json()
+    except Exception:
+        return
+
+    for cmd in pending:
+        cmd_id = cmd["id"]
+        command = cmd["command"]
+        handler = COMMAND_HANDLERS.get(command)
+        if not handler:
+            log.warning("Unknown command received: %s", command)
+            continue
+
+        log.info("Executing command: %s (id=%s)", command, cmd_id)
+        requests.post(
+            f"{base}/api/machines/{machine}/commands/{cmd_id}/result",
+            json={"status": "running"}, headers=headers, timeout=cfg["timeout_seconds"],
+        )
+        try:
+            output = handler()
+            status = "done"
+        except Exception as e:
+            output = f"Error: {e}"
+            status = "failed"
+            log.exception("Command %s failed: %s", command, e)
+
+        log.info("Command %s finished with status: %s", command, status)
+        try:
+            requests.post(
+                f"{base}/api/machines/{machine}/commands/{cmd_id}/result",
+                json={"status": status, "output": output[:8000]},
+                headers=headers, timeout=cfg["timeout_seconds"],
+            )
+        except Exception:
+            pass
+
+
 def main():
     parser = argparse.ArgumentParser(description="System monitor agent")
     parser.add_argument("--config", default="config.yaml")
@@ -107,6 +193,9 @@ def main():
                 send_snapshot(snapshot, cfg)
         except Exception as e:
             log.exception("Unexpected error during collection: %s", e)
+
+        if not args.dry_run:
+            poll_and_run_commands(cfg)
 
         if args.once:
             break
