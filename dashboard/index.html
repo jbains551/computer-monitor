@@ -4,111 +4,157 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>System Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/feather-icons/dist/feather.min.js"></script>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
+
   <header>
     <div class="header-inner">
-      <h1>System Monitor</h1>
+      <div class="header-brand">
+        <div class="brand-icon"><i data-feather="activity"></i></div>
+        <div>
+          <h1>System Monitor</h1>
+          <span class="brand-sub">Infrastructure Dashboard</span>
+        </div>
+      </div>
       <div class="header-right">
-        <span id="server-status" class="badge badge-unknown">Connecting...</span>
-        <span id="last-refresh" class="muted"></span>
+        <div class="header-meta">
+          <span id="server-status" class="badge badge-unknown">Connecting...</span>
+          <span id="last-refresh" class="muted"></span>
+        </div>
+        <div class="refresh-ring" title="Time until next refresh">
+          <svg viewBox="0 0 36 36" class="ring-svg">
+            <circle cx="18" cy="18" r="15" class="ring-bg"/>
+            <circle cx="18" cy="18" r="15" class="ring-fill" id="refresh-ring"/>
+          </svg>
+          <span id="refresh-countdown" class="ring-label">60</span>
+        </div>
       </div>
     </div>
   </header>
 
   <main>
-    <!-- Machine selector tabs -->
+    <!-- Machine selector -->
     <nav id="machine-tabs" class="tab-bar"></nav>
 
     <!-- Alert banner -->
     <section id="alert-section" class="alert-section hidden"></section>
 
+    <!-- Machine info bar -->
+    <div id="machine-info-bar" class="machine-info-bar hidden">
+      <span id="info-os" class="info-chip"><i data-feather="monitor"></i> <span></span></span>
+      <span id="info-hostname" class="info-chip"><i data-feather="server"></i> <span></span></span>
+      <span id="info-uptime" class="info-chip"><i data-feather="clock"></i> <span></span></span>
+      <span id="info-load" class="info-chip"><i data-feather="bar-chart-2"></i> <span></span></span>
+    </div>
+
     <!-- Overview cards -->
     <section id="overview" class="card-grid hidden">
-      <div class="card" id="card-status">
+
+      <div class="card card-status" id="card-status">
+        <div class="card-icon"><i data-feather="radio"></i></div>
         <div class="card-label">Status</div>
         <div class="card-value" id="val-status">—</div>
         <div class="card-sub" id="val-uptime"></div>
       </div>
+
       <div class="card" id="card-cpu">
-        <div class="card-label">CPU</div>
+        <div class="card-icon"><i data-feather="cpu"></i></div>
+        <div class="card-label">CPU Usage</div>
         <div class="card-value" id="val-cpu">—</div>
-        <div class="progress-bar"><div class="progress-fill" id="bar-cpu"></div></div>
-        <div class="card-sub" id="val-cpu-sub"></div>
+        <div class="progress-wrap">
+          <div class="progress-bar"><div class="progress-fill" id="bar-cpu"></div></div>
+          <span class="progress-label" id="val-cpu-sub"></span>
+        </div>
       </div>
+
       <div class="card" id="card-mem">
+        <div class="card-icon"><i data-feather="layers"></i></div>
         <div class="card-label">Memory</div>
         <div class="card-value" id="val-mem">—</div>
-        <div class="progress-bar"><div class="progress-fill" id="bar-mem"></div></div>
-        <div class="card-sub" id="val-mem-sub"></div>
+        <div class="progress-wrap">
+          <div class="progress-bar"><div class="progress-fill" id="bar-mem"></div></div>
+          <span class="progress-label" id="val-mem-sub"></span>
+        </div>
       </div>
+
       <div class="card" id="card-disk">
+        <div class="card-icon"><i data-feather="hard-drive"></i></div>
         <div class="card-label">Disk (primary)</div>
         <div class="card-value" id="val-disk">—</div>
-        <div class="progress-bar"><div class="progress-fill" id="bar-disk"></div></div>
-        <div class="card-sub" id="val-disk-sub"></div>
+        <div class="progress-wrap">
+          <div class="progress-bar"><div class="progress-fill" id="bar-disk"></div></div>
+          <span class="progress-label" id="val-disk-sub"></span>
+        </div>
       </div>
+
       <div class="card" id="card-net">
+        <div class="card-icon"><i data-feather="wifi"></i></div>
         <div class="card-label">Network I/O</div>
-        <div class="card-value" id="val-net-sent">—</div>
-        <div class="card-sub" id="val-net-recv"></div>
+        <div class="card-value net-value">
+          <span class="net-row"><i data-feather="arrow-up"></i><span id="val-net-sent">—</span></span>
+          <span class="net-row"><i data-feather="arrow-down"></i><span id="val-net-recv">—</span></span>
+        </div>
       </div>
+
       <div class="card" id="card-security">
+        <div class="card-icon"><i data-feather="shield"></i></div>
         <div class="card-label">Security</div>
         <div class="card-value" id="val-security">—</div>
         <div class="card-sub" id="val-security-sub"></div>
       </div>
+
     </section>
 
     <!-- Detailed panels -->
     <section id="detail-section" class="detail-grid hidden">
 
-      <!-- Disk detail -->
       <div class="panel">
-        <h3>Disk Usage</h3>
+        <h3><i data-feather="hard-drive"></i> Disk Usage</h3>
         <div id="disk-list"></div>
       </div>
 
-      <!-- Open ports -->
       <div class="panel">
-        <h3>Listening Ports</h3>
+        <h3><i data-feather="radio"></i> Listening Ports</h3>
         <div id="port-list"></div>
       </div>
 
-      <!-- Failed logins -->
       <div class="panel">
-        <h3>Failed Logins (24h)</h3>
+        <h3><i data-feather="lock"></i> Failed Logins (24h)</h3>
         <div id="login-list"></div>
       </div>
 
-      <!-- Package updates -->
       <div class="panel">
-        <h3>Available Package Updates</h3>
+        <h3><i data-feather="package"></i> Available Updates</h3>
         <div id="update-list"></div>
       </div>
 
-      <!-- Suspicious processes -->
       <div class="panel">
-        <h3>Suspicious Processes</h3>
+        <h3><i data-feather="alert-triangle"></i> Suspicious Processes</h3>
         <div id="proc-list"></div>
       </div>
 
-      <!-- Network interfaces -->
       <div class="panel">
-        <h3>Network Interfaces</h3>
+        <h3><i data-feather="globe"></i> Network Interfaces</h3>
         <div id="iface-list"></div>
       </div>
 
     </section>
 
     <div id="no-data" class="no-data hidden">
-      <p>No data received from this machine yet.<br>Make sure the agent is running and pointed at this server.</p>
+      <div class="no-data-icon"><i data-feather="cloud-off"></i></div>
+      <p>No data received from this machine yet.</p>
+      <p class="muted">Make sure the agent is running and pointed at this server.</p>
     </div>
   </main>
 
   <footer>
-    <span>System Monitor &mdash; auto-refreshes every 60s</span>
+    <span>System Monitor &mdash; refreshes every 60s</span>
+    <span id="footer-time" class="muted"></span>
   </footer>
 
   <script src="js/dashboard.js"></script>
