@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>System Monitor</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>System Monitor</h1>
+      <div class="header-right">
+        <span id="server-status" class="badge badge-unknown">Connecting...</span>
+        <span id="last-refresh" class="muted"></span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Machine selector tabs -->
+    <nav id="machine-tabs" class="tab-bar"></nav>
+
+    <!-- Alert banner -->
+    <section id="alert-section" class="alert-section hidden"></section>
+
+    <!-- Overview cards -->
+    <section id="overview" class="card-grid hidden">
+      <div class="card" id="card-status">
+        <div class="card-label">Status</div>
+        <div class="card-value" id="val-status">—</div>
+        <div class="card-sub" id="val-uptime"></div>
+      </div>
+      <div class="card" id="card-cpu">
+        <div class="card-label">CPU</div>
+        <div class="card-value" id="val-cpu">—</div>
+        <div class="progress-bar"><div class="progress-fill" id="bar-cpu"></div></div>
+        <div class="card-sub" id="val-cpu-sub"></div>
+      </div>
+      <div class="card" id="card-mem">
+        <div class="card-label">Memory</div>
+        <div class="card-value" id="val-mem">—</div>
+        <div class="progress-bar"><div class="progress-fill" id="bar-mem"></div></div>
+        <div class="card-sub" id="val-mem-sub"></div>
+      </div>
+      <div class="card" id="card-disk">
+        <div class="card-label">Disk (primary)</div>
+        <div class="card-value" id="val-disk">—</div>
+        <div class="progress-bar"><div class="progress-fill" id="bar-disk"></div></div>
+        <div class="card-sub" id="val-disk-sub"></div>
+      </div>
+      <div class="card" id="card-net">
+        <div class="card-label">Network I/O</div>
+        <div class="card-value" id="val-net-sent">—</div>
+        <div class="card-sub" id="val-net-recv"></div>
+      </div>
+      <div class="card" id="card-security">
+        <div class="card-label">Security</div>
+        <div class="card-value" id="val-security">—</div>
+        <div class="card-sub" id="val-security-sub"></div>
+      </div>
+    </section>
+
+    <!-- Detailed panels -->
+    <section id="detail-section" class="detail-grid hidden">
+
+      <!-- Disk detail -->
+      <div class="panel">
+        <h3>Disk Usage</h3>
+        <div id="disk-list"></div>
+      </div>
+
+      <!-- Open ports -->
+      <div class="panel">
+        <h3>Listening Ports</h3>
+        <div id="port-list"></div>
+      </div>
+
+      <!-- Failed logins -->
+      <div class="panel">
+        <h3>Failed Logins (24h)</h3>
+        <div id="login-list"></div>
+      </div>
+
+      <!-- Package updates -->
+      <div class="panel">
+        <h3>Available Package Updates</h3>
+        <div id="update-list"></div>
+      </div>
+
+      <!-- Suspicious processes -->
+      <div class="panel">
+        <h3>Suspicious Processes</h3>
+        <div id="proc-list"></div>
+      </div>
+
+      <!-- Network interfaces -->
+      <div class="panel">
+        <h3>Network Interfaces</h3>
+        <div id="iface-list"></div>
+      </div>
+
+    </section>
+
+    <div id="no-data" class="no-data hidden">
+      <p>No data received from this machine yet.<br>Make sure the agent is running and pointed at this server.</p>
+    </div>
+  </main>
+
+  <footer>
+    <span>System Monitor &mdash; auto-refreshes every 60s</span>
+  </footer>
+
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - API_KEY=${API_KEY:-change-me}
+      - DB_PATH=/data/monitor.db
+    volumes:
+      - monitor_data:/data
+      - ../dashboard:/app/dashboard:ro   # serve dashboard from same container
+    restart: unless-stopped
+
+volumes:
+  monitor_data:

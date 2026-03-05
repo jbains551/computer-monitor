@@ -1,0 +1,17 @@
+# Agent configuration — copy to config.yaml and fill in your values
+# config.yaml is gitignored so your API key stays private
+
+# URL of your central server (local or deployed)
+server_url: "https://your-server.onrender.com"
+
+# Must match the API_KEY set on the server
+api_key: "change-me-to-a-long-random-string"
+
+# Human-readable name for this machine (shows up in the dashboard)
+machine_name: "Jason-MacBook"
+
+# One of: mac | pc | raspberry-pi
+machine_type: "mac"
+
+# How often to collect and send metrics (seconds)
+interval_seconds: 60
