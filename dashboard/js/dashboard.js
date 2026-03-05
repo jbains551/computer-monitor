@@ -370,21 +370,32 @@ function renderAlerts(alerts) {
         &mdash; ${escHtml(a.message)}
         <span class="alert-meta">${age}</span>
       </span>
-      <button class="alert-ack" onclick="ackAlert(${a.id})">Dismiss</button>
+      <button class="alert-ack" onclick="deleteAlert(${a.id})" title="Permanently delete this alert">
+        <i data-feather="trash-2"></i> Delete
+      </button>
     </div>`;
   }).join("");
+  reinitIcons();
 }
 
-async function ackAlert(id) {
+async function deleteAlert(id) {
   const key = localStorage.getItem("monitor_api_key") || "";
+  if (!key) {
+    alert("Set your API key first:\n\nlocalStorage.setItem('monitor_api_key', 'your-key')");
+    return;
+  }
   try {
-    await fetch(`${API_BASE}/api/alerts/${id}/acknowledge`, {
-      method: "POST",
+    const resp = await fetch(`${API_BASE}/api/alerts/${id}`, {
+      method: "DELETE",
       headers: { "Authorization": `Bearer ${key}` },
     });
-    document.getElementById(`alert-${id}`)?.remove();
+    if (resp.ok) {
+      document.getElementById(`alert-${id}`)?.remove();
+      const section = document.getElementById("alert-section");
+      if (section && !section.querySelector(".alert-item")) section.classList.add("hidden");
+    }
   } catch {
-    alert("Set your API key first:\n\nlocalStorage.setItem('monitor_api_key', 'your-key')");
+    alert("Could not delete alert — check your API key.");
   }
 }
 

@@ -10,15 +10,24 @@ MEM_WARN = 85.0
 MEM_CRIT = 95.0
 DISK_WARN = 85.0
 DISK_CRIT = 95.0
-OFFLINE_SECONDS = 300   # 5 minutes without a heartbeat
+OFFLINE_SECONDS = 300       # 5 minutes without a heartbeat
+ALERT_INTERVAL = 3600       # only evaluate alerts once per hour per machine
+
+# In-memory throttle: machine_name -> last evaluation timestamp
+_last_evaluated: dict[str, float] = {}
 
 
 def evaluate_snapshot(machine: str, system: dict, security: dict):
     """Generate alerts based on metrics in a snapshot.
 
-    Messages are kept stable (no fluctuating numbers) so the dedup check in
-    save_alert() correctly suppresses re-creation after a dismiss.
+    Runs at most once per hour per machine. Messages are kept stable so the
+    dedup check in save_alert() correctly suppresses re-creation after a dismiss.
     """
+    now = time.time()
+    if now - _last_evaluated.get(machine, 0) < ALERT_INTERVAL:
+        return
+    _last_evaluated[machine] = now
+
     cpu = (system.get("cpu") or {}).get("percent", 0)
     if cpu >= CPU_CRIT:
         save_alert(machine, "critical", "health", f"CPU usage exceeds {CPU_CRIT}% threshold")

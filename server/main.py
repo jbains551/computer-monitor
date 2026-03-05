@@ -111,6 +111,12 @@ def acknowledge_alert(alert_id: int):
     return {"status": "ok"}
 
 
+@app.delete("/api/alerts/{alert_id}", dependencies=[Depends(verify_api_key)])
+def delete_alert(alert_id: int):
+    database.delete_alert(alert_id)
+    return {"status": "ok"}
+
+
 # ── Commands ───────────────────────────────────────────────────────────────────
 
 ALLOWED_COMMANDS = {"update_packages"}

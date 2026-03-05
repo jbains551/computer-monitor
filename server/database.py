@@ -181,6 +181,11 @@ def acknowledge_alert(alert_id: int):
         conn.execute("UPDATE alerts SET acknowledged=1 WHERE id=?", (alert_id,))
 
 
+def delete_alert(alert_id: int):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM alerts WHERE id=?", (alert_id,))
+
+
 def queue_command(machine: str, command: str) -> int:
     with get_conn() as conn:
         cur = conn.execute(
