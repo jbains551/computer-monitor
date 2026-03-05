@@ -35,48 +35,127 @@ UNUSUAL_PORTS = {
 }
 
 
+def _ports_via_lsof() -> list:
+    """Parse listening ports from lsof — works on macOS/Linux without root."""
+    result = subprocess.run(
+        ["lsof", "-iTCP", "-sTCP:LISTEN", "-n", "-P"],
+        capture_output=True, text=True, timeout=10,
+    )
+    seen = set()
+    entries = []
+    for line in result.stdout.splitlines()[1:]:  # skip header
+        parts = line.split()
+        if len(parts) < 9:
+            continue
+        # NAME column is second-to-last; last is "(LISTEN)"
+        name_field = parts[-2] if parts[-1] == "(LISTEN)" else parts[-1]
+        if ":" not in name_field:
+            continue
+        addr, port_str = name_field.rsplit(":", 1)
+        port_str = port_str.rstrip("(LISTEN)").strip()
+        try:
+            port = int(port_str)
+        except ValueError:
+            continue
+        if port in seen:
+            continue
+        seen.add(port)
+        entries.append({
+            "port": port,
+            "address": addr.strip("[]") or "*",
+            "pid": int(parts[1]) if parts[1].isdigit() else None,
+            "process": parts[0],
+        })
+    return entries
+
+
+def _ports_via_netstat() -> list:
+    """Parse listening ports from netstat — fallback for Linux without lsof."""
+    result = subprocess.run(
+        ["netstat", "-tlnp"],
+        capture_output=True, text=True, timeout=10,
+    )
+    seen = set()
+    entries = []
+    for line in result.stdout.splitlines():
+        if "LISTEN" not in line:
+            continue
+        parts = line.split()
+        if len(parts) < 4:
+            continue
+        addr_port = parts[3]
+        if ":" not in addr_port:
+            continue
+        port_str = addr_port.rsplit(":", 1)[-1]
+        try:
+            port = int(port_str)
+        except ValueError:
+            continue
+        if port in seen:
+            continue
+        seen.add(port)
+        proc = parts[-1] if "/" in parts[-1] else "unknown"
+        pid_str, _, proc_name = proc.partition("/")
+        entries.append({
+            "port": port,
+            "address": addr_port.rsplit(":", 1)[0],
+            "pid": int(pid_str) if pid_str.isdigit() else None,
+            "process": proc_name or "unknown",
+        })
+    return entries
+
+
 def get_open_ports() -> dict:
     listening = []
-    established = []
     flagged = []
+    established_count = 0
 
+    # Try psutil first (works on Linux/Windows and macOS with root)
     try:
-        for conn in psutil.net_connections(kind="inet"):
+        conns = psutil.net_connections(kind="inet")
+        for conn in conns:
             if conn.status == "LISTEN" and conn.laddr:
                 port = conn.laddr.port
                 try:
                     proc_name = psutil.Process(conn.pid).name() if conn.pid else "unknown"
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     proc_name = "unknown"
-
-                entry = {
+                listening.append({
                     "port": port,
                     "address": conn.laddr.ip,
                     "pid": conn.pid,
                     "process": proc_name,
-                }
-                listening.append(entry)
-                if port in UNUSUAL_PORTS:
-                    flagged.append({**entry, "reason": f"Unusual listening port {port}"})
-
-            elif conn.status == "ESTABLISHED" and conn.raddr:
-                try:
-                    proc_name = psutil.Process(conn.pid).name() if conn.pid else "unknown"
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    proc_name = "unknown"
-                established.append({
-                    "local": f"{conn.laddr.ip}:{conn.laddr.port}",
-                    "remote": f"{conn.raddr.ip}:{conn.raddr.port}",
-                    "pid": conn.pid,
-                    "process": proc_name,
                 })
+            elif conn.status == "ESTABLISHED" and conn.raddr:
+                established_count += 1
+
     except psutil.AccessDenied:
-        pass
+        # macOS without root — fall back to lsof then netstat
+        try:
+            listening = _ports_via_lsof()
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            try:
+                listening = _ports_via_netstat()
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                pass
+
+    # Deduplicate by port number
+    seen = set()
+    unique = []
+    for entry in listening:
+        if entry["port"] not in seen:
+            seen.add(entry["port"])
+            unique.append(entry)
+    listening = sorted(unique, key=lambda e: e["port"])
+
+    for entry in listening:
+        if entry["port"] in UNUSUAL_PORTS:
+            flagged.append({**entry, "reason": f"Unusual listening port {entry['port']}"})
 
     return {
         "listening": listening,
-        "established_count": len(established),
-        "established": established[:50],  # cap to avoid huge payloads
+        "established_count": established_count,
+        "established": [],
         "flagged": flagged,
     }
 
