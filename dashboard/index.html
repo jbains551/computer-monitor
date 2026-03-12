@@ -3,22 +3,23 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>System Monitor</title>
+  <title>SYS//MONITOR</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://unpkg.com/feather-icons/dist/feather.min.js"></script>
   <link rel="stylesheet" href="/static/css/style.css?v=5" />
 </head>
 <body>
+  <canvas id="matrix-rain"></canvas>
 
   <header>
     <div class="header-inner">
       <div class="header-brand">
         <div class="brand-icon"><i data-feather="activity"></i></div>
         <div>
-          <h1>System Monitor</h1>
-          <span class="brand-sub">Infrastructure Dashboard</span>
+          <h1>SYS//MONITOR</h1>
+          <span class="brand-sub">MATRIX // INFRASTRUCTURE</span>
         </div>
       </div>
       <div class="header-right">
@@ -163,10 +164,42 @@
   </main>
 
   <footer>
-    <span>System Monitor &mdash; refreshes every 60s</span>
+    <span>SYS//MONITOR &mdash; REFRESH CYCLE 60s</span>
     <span id="footer-time" class="muted"></span>
   </footer>
 
   <script src="/static/js/dashboard.js?v=5"></script>
+  <script>
+    (function() {
+      const canvas = document.getElementById('matrix-rain');
+      const ctx = canvas.getContext('2d');
+      const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホ01アBCDEF0123456789ABCDEF';
+      let cols, drops;
+      function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        cols = Math.floor(canvas.width / 18);
+        drops = Array.from({length: cols}, () => Math.random() * -canvas.height / 18);
+      }
+      function draw() {
+        ctx.fillStyle = 'rgba(0,0,0,0.05)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < cols; i++) {
+          const c = chars[Math.floor(Math.random() * chars.length)];
+          const x = i * 18;
+          const y = drops[i] * 18;
+          const bright = Math.random() > 0.95;
+          ctx.fillStyle = bright ? '#ffffff' : (Math.random() > 0.7 ? '#39ff14' : '#00cc33');
+          ctx.font = bright ? 'bold 13px monospace' : '13px monospace';
+          ctx.fillText(c, x, y);
+          if (y > canvas.height && Math.random() > 0.975) drops[i] = 0;
+          drops[i] += 0.4;
+        }
+      }
+      resize();
+      window.addEventListener('resize', resize);
+      setInterval(draw, 50);
+    })();
+  </script>
 </body>
 </html>
